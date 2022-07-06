@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
-	"github.com/open-telemetry/opamp-go/internal/examples/server/opampsrv"
-	"github.com/open-telemetry/opamp-go/internal/examples/server/uisrv"
 	"log"
 	"os"
 	"os/signal"
+
+	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/opampsrv"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/uisrv"
 )
 
 var logger = log.New(log.Default().Writer(), "[MAIN] ", log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds)
