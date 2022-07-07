@@ -1,12 +1,14 @@
 package data
 
 import (
+	"log"
 	"sync"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
-	"github.com/open-telemetry/opamp-go/protobufshelpers"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
+
+var logger = log.New(log.Default().Writer(), "[OPAMP] ", log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds)
 
 type Agents struct {
 	mux         sync.RWMutex
@@ -21,6 +23,7 @@ func (agents *Agents) RemoveConnection(conn types.Connection) {
 	defer agents.mux.Unlock()
 
 	for instanceId := range agents.connections[conn] {
+		logger.Printf("Removed connection from agent: ", string(instanceId))
 		delete(agents.agentsById, instanceId)
 	}
 	delete(agents.connections, conn)
@@ -37,28 +40,10 @@ func (agents *Agents) SetCustomConfigForAgent(
 	}
 }
 
-func isEqualAgentDescr(d1, d2 *protobufs.AgentDescription) bool {
-	if d1 == d2 {
-		return true
+func (agents *Agents) SetCustomConfigForAllAgent(config *protobufs.AgentConfigMap) {
+	for _, agent := range agents.agentsById {
+		agent.SetCustomConfig(config, nil)
 	}
-	if d1 == nil || d2 == nil {
-		return false
-	}
-	return isEqualAttrs(d1.IdentifyingAttributes, d2.IdentifyingAttributes) &&
-		isEqualAttrs(d1.NonIdentifyingAttributes, d2.NonIdentifyingAttributes)
-}
-
-func isEqualAttrs(attrs1, attrs2 []*protobufs.KeyValue) bool {
-	if len(attrs1) != len(attrs2) {
-		return false
-	}
-	for i, a1 := range attrs1 {
-		a2 := attrs2[i]
-		if !protobufshelpers.IsEqualKeyValue(a1, a2) {
-			return false
-		}
-	}
-	return true
 }
 
 func (agents *Agents) FindAgent(agentId InstanceId) *Agent {

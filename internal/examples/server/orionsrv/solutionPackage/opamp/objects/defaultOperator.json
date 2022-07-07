@@ -1,0 +1,10 @@
+{
+  "apiVersion": "opentelemetry.io/v1alpha1",
+  "kind": "OpenTelemetryCollector",
+  "metadata": {
+    "name": "simplest"
+  },
+  "spec": {
+    "config": "|\n    receivers:\n      otlp:\n        protocols:\n          grpc:\n          http:\n    processors:\n\n    exporters:\n      logging:\n\n    service:\n      pipelines:\n        traces:\n          receivers: [otlp]\n          processors: []\n          exporters: [logging]"
+  }
+}

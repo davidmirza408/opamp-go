@@ -1,0 +1,20 @@
+{
+  "manifestVersion": "1.0.0",
+  "name": "opamp",
+  "solutionVersion": "1.0.2",
+  "dependencies": [],
+  "description": "opamp",
+  "contact": "support@appd.com",
+  "homepage": "solutions.appd.com/opamp",
+  "gitRepoUrl": "https://bitbucket.corp.appdynamics.com/projects/ARCH/repos/json-store-poc/browse/systemSolutions/opamp",
+  "readme" : "readme.md",
+  "types" : [
+    "types/operator.json"
+  ],
+  "objects" : [
+    {
+      "type": "opamp:operator",
+      "objectsFile": "objects/defaultOperator.json"
+    }
+  ]
+}

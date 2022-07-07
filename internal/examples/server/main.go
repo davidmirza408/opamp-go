@@ -7,6 +7,7 @@ import (
 
 	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
 	"github.com/open-telemetry/opamp-go/internal/examples/server/opampsrv"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/internal/examples/server/uisrv"
 )
 
@@ -25,6 +26,10 @@ func main() {
 	opampSrv.Start()
 
 	logger.Println("OpAMP Server running...")
+
+	logger.Println("Orion poller starting...")
+	orionsrv.Start()
+	logger.Println("Orion poller running...")
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)

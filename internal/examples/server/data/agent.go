@@ -6,8 +6,7 @@ import (
 	"crypto/sha256"
 	"sync"
 
-	"google.golang.org/protobuf/proto"
-
+	"github.com/golang/protobuf/proto"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
@@ -179,6 +178,7 @@ func (agent *Agent) processStatusUpdate(
 	response *protobufs.ServerToAgent,
 ) {
 	agentDescrChanged := agent.updateStatusField(newStatus)
+	logger.Printf("AgentDescription changed: ", agentDescrChanged)
 
 	configChanged := false
 	if agentDescrChanged {
@@ -186,6 +186,7 @@ func (agent *Agent) processStatusUpdate(
 		//
 		// We need to recalculate the config.
 		configChanged = agent.calcRemoteConfig()
+		logger.Printf("Remote configuration changed: ", configChanged)
 
 		// And set connection settings that are appropriate for the Agent description.
 		agent.calcConnectionSettings(response)
@@ -331,14 +332,9 @@ func (agent *Agent) calcConnectionSettings(response *protobufs.ServerToAgent) {
 	// Agent description, so we jst set them directly.
 
 	response.ConnectionSettings = &protobufs.ConnectionSettingsOffers{
-		Hash:  nil, // TODO: calc has from settings.
-		Opamp: nil,
-		OwnMetrics: &protobufs.TelemetryConnectionSettings{
-			// We just hard-code this to a port on a localhost on which we can
-			// run an Otel Collector for demo purposes. With real production
-			// servers this should likely point to an OTLP backend.
-			DestinationEndpoint: "http://localhost:4318/v1/metrics",
-		},
+		Hash:             nil, // TODO: calc has from settings.
+		Opamp:            nil,
+		OwnMetrics:       nil,
 		OwnTraces:        nil,
 		OwnLogs:          nil,
 		OtherConnections: nil,
@@ -349,5 +345,6 @@ func (agent *Agent) SendToAgent(msg *protobufs.ServerToAgent) {
 	agent.connMutex.Lock()
 	defer agent.connMutex.Unlock()
 
-	agent.conn.Send(context.Background(), msg)
+	logger.Printf("Sending self initiated message: ", proto.MarshalTextString(msg))
+	_ = agent.conn.Send(context.Background(), msg)
 }

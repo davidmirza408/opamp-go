@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"net/url"
@@ -45,7 +46,6 @@ type MetricReporter struct {
 }
 
 func NewMetricReporter(
-	logger types.Logger,
 	dest *protobufs.TelemetryConnectionSettings,
 	agentType string,
 	agentVersion string,
@@ -113,8 +113,14 @@ func NewMetricReporter(
 
 	global.SetMeterProvider(cont)
 
+	logger := log.New(
+		log.Default().Writer(),
+		"[MetricReporter] ",
+		log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds,
+	)
+
 	reporter := &MetricReporter{
-		logger: logger,
+		logger: &Logger{Logger: logger},
 	}
 
 	reporter.done = make(chan struct{})

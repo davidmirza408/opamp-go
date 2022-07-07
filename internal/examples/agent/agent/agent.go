@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"runtime"
@@ -57,10 +58,16 @@ type Agent struct {
 	metricReporter *MetricReporter
 }
 
-func NewAgent(logger types.Logger, agentType string, agentVersion string) *Agent {
+func NewAgent(agentType string, agentVersion string) *Agent {
+	logger := log.New(
+		log.Default().Writer(),
+		"[Client] ",
+		log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds,
+	)
+
 	agent := &Agent{
 		effectiveConfig: localConfig,
-		logger:          logger,
+		logger:          &Logger{Logger: logger},
 		agentType:       agentType,
 		agentVersion:    agentVersion,
 	}
@@ -104,6 +111,7 @@ func (agent *Agent) start() error {
 		},
 		RemoteConfigStatus: agent.remoteConfigStatus,
 	}
+
 	err := agent.opampClient.SetAgentDescription(agent.agentDescription)
 	if err != nil {
 		return err
@@ -203,7 +211,7 @@ func (agent *Agent) composeEffectiveConfig() *protobufs.EffectiveConfig {
 }
 
 func (agent *Agent) initMeter(settings *protobufs.TelemetryConnectionSettings) {
-	reporter, err := NewMetricReporter(agent.logger, settings, agent.agentType, agent.agentVersion, agent.instanceId)
+	reporter, err := NewMetricReporter(settings, agent.agentType, agent.agentVersion, agent.instanceId)
 	if err != nil {
 		agent.logger.Errorf("Cannot collect metrics: %v", err)
 		return

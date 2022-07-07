@@ -72,6 +72,7 @@ func (c *wsClient) Start(ctx context.Context, settings types.StartSettings) erro
 	c.requestHeader = settings.Header
 
 	c.common.StartConnectAndRun(c.runUntilStopped)
+	c.common.Logger.Debugf("Starting OpAMP WebSocket client...")
 
 	return nil
 }
