@@ -1,5 +1,15 @@
 {{ template "header.html" . }}
 
+<h2>Orion Configuration</h2>
+
+<style>
+    td {
+        padding: 5px
+    }
+</style>
+
+<a href="/orion">Setup Orion Configuration</a>
+
 <h2>Agents</h2>
 
 <style>
@@ -12,11 +22,11 @@
     <tr>
         <th>Instance ID</th>
     </tr>
-{{ range . }}
+    {{ range . }}
     <tr>
         <td><a href="agent?instanceid={{ .InstanceId }}">{{ .InstanceId }}</a></td>
     </tr>
-{{ end }}
+    {{ end }}
 </table>
 
 </body>

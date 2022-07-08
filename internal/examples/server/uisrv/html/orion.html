@@ -1,0 +1,46 @@
+{{ template "header.html" . }}
+
+<a href="/">Back to Home</a>
+
+<style>
+    td {
+        padding: 5px
+    }
+</style>
+
+<link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+
+<h3>Orion Configuration</h3>
+
+<hr/>
+
+<table width="100%">
+    <tr>
+        <td valign="top">
+            Current Object Configuration:<br/>
+            <pre><code class="language-yaml">{{ .CurrentFullConfig }}</code></pre>
+        </td>
+    </tr>
+</table>
+
+<hr/>
+
+<table width="100%">
+    <tr>
+        <td valign="top">
+            Update Object Configuration:<br/>
+            <form action="/save_object_config" method="post">
+                <textarea cols="200" rows="20" name="config">{{ .CurrentObjectConfig }}</textarea><br/>
+                <input type="submit" value="Save and Update Object"/>
+            </form>
+        </td>
+    </tr>
+</table>
+
+<hr/>
+
+</body>
+</html>

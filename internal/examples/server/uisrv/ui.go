@@ -2,6 +2,7 @@ package uisrv
 
 import (
 	"context"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"log"
 	"net/http"
 	"path"
@@ -24,6 +25,8 @@ func Start(rootDir string) {
 	mux.HandleFunc("/", renderRoot)
 	mux.HandleFunc("/agent", renderAgent)
 	mux.HandleFunc("/save_config", saveCustomConfigForInstance)
+	mux.HandleFunc("/orion", renderOrion)
+	mux.HandleFunc("/save_object_config", saveOpampObjectConfiguration)
 	srv = &http.Server{
 		Addr:    "0.0.0.0:4321",
 		Handler: mux,
@@ -69,6 +72,15 @@ func renderAgent(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "agent.html", agent)
 }
 
+func renderOrion(w http.ResponseWriter, r *http.Request) {
+	opampConfig := orionsrv.OrionServ.GetOpampConfiguration()
+	if opampConfig == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	renderTemplate(w, "orion.html", opampConfig)
+}
+
 func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -102,4 +114,28 @@ func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/agent?instanceid="+string(instanceId), http.StatusSeeOther)
+}
+
+func saveOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	configStr := r.PostForm.Get("config")
+
+	if err := orionsrv.OrionServ.UpdateOpampConfiguration(configStr); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Wait for up to 1 seconds for a Status update, which is expected
+	// to be reported by the Agent after we set the remote config.
+	timer := time.NewTicker(time.Second * 1)
+
+	select {
+	case <-timer.C:
+	}
+
+	http.Redirect(w, r, "/orion", http.StatusSeeOther)
 }
