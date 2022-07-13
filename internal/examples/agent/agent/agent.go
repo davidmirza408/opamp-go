@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/knadh/koanf"
-	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/providers/rawbytes"
 	"github.com/oklog/ulid/v2"
 
@@ -22,20 +22,35 @@ import (
 )
 
 const localConfig = `
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-          http:
-    processors:
-    exporters:
-      logging:
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [logging]
+{
+  "receivers": {
+    "otlp": {
+      "protocols": {
+        "grpc": null,
+        "http": null
+      }
+    }
+  },
+  "processors": null,
+  "exporters": {
+    "logging": null
+  },
+  "service": {
+    "pipelines": {
+      "traces": {
+        "receivers": [
+          "otlp"
+        ],
+        "processors": [
+
+        ],
+        "exporters": [
+          "logging"
+        ]
+      }
+    }
+  }
+}
 `
 
 type Agent struct {
@@ -187,9 +202,9 @@ func (agent *Agent) updateAgentIdentity(instanceId ulid.ULID) {
 
 func (agent *Agent) loadLocalConfig() {
 	var k = koanf.New(".")
-	_ = k.Load(rawbytes.Provider([]byte(localConfig)), yaml.Parser())
+	_ = k.Load(rawbytes.Provider([]byte(localConfig)), json.Parser())
 
-	effectiveConfigBytes, err := k.Marshal(yaml.Parser())
+	effectiveConfigBytes, err := k.Marshal(json.Parser())
 	if err != nil {
 		panic(err)
 	}
@@ -258,7 +273,7 @@ func (agent *Agent) applyRemoteConfig(config *protobufs.AgentRemoteConfig) (conf
 
 	// Begin with local config. We will later merge received configs on top of it.
 	var k = koanf.New(".")
-	if err := k.Load(rawbytes.Provider([]byte(localConfig)), yaml.Parser()); err != nil {
+	if err := k.Load(rawbytes.Provider([]byte(localConfig)), json.Parser()); err != nil {
 		return false, err
 	}
 
@@ -289,7 +304,7 @@ func (agent *Agent) applyRemoteConfig(config *protobufs.AgentRemoteConfig) (conf
 	// Merge received configs.
 	for _, item := range orderedConfigs {
 		var k2 = koanf.New(".")
-		err := k2.Load(rawbytes.Provider(item.file.Body), yaml.Parser())
+		err := k2.Load(rawbytes.Provider(item.file.Body), json.Parser())
 		if err != nil {
 			return false, fmt.Errorf("cannot parse config named %s: %v", item.name, err)
 		}
@@ -300,7 +315,7 @@ func (agent *Agent) applyRemoteConfig(config *protobufs.AgentRemoteConfig) (conf
 	}
 
 	// The merged final result is our effective config.
-	effectiveConfigBytes, err := k.Marshal(yaml.Parser())
+	effectiveConfigBytes, err := k.Marshal(json.Parser())
 	if err != nil {
 		panic(err)
 	}

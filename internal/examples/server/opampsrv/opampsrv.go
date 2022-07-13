@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	clientTypes "github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server"
 	"github.com/open-telemetry/opamp-go/server/types"
@@ -65,6 +66,8 @@ func (srv *Server) onMessage(conn types.Connection, msg *protobufs.AgentToServer
 	instanceId := data.InstanceId(msg.InstanceUid)
 
 	agent := srv.agents.FindOrCreateAgent(instanceId, conn)
+
+	orionsrv.OrionServ.FetchOpampConfiguration()
 
 	// Start building the response.
 	response := &protobufs.ServerToAgent{}

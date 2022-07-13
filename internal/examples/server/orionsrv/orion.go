@@ -10,7 +10,6 @@ import (
 	"net/http/httputil"
 	"time"
 
-	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
 	"github.com/open-telemetry/opamp-go/protobufs"
 )
@@ -64,13 +63,13 @@ func (orionService *OrionService) runForEver() {
 	for {
 		select {
 		case <-time.After(orionService.orionClient.interval):
-			orionService.fetchOpampConfiguration()
+			orionService.FetchOpampConfiguration()
 		}
 	}
 }
 
 func (orionService *OrionService) GetAllOpampConfiguration() *AllOpampConfiguration {
-	orionService.fetchOpampConfiguration()
+	orionService.FetchOpampConfiguration()
 
 	return orionService.AllOpampConfig
 }
@@ -83,7 +82,7 @@ func (orionService *OrionService) UpdateOpampConfiguration(objectType ObjectType
 	return nil
 }
 
-func (orionService *OrionService) fetchOpampConfiguration() {
+func (orionService *OrionService) FetchOpampConfiguration() {
 	orionService.fetchOpampConfigFromOrion(OtelOperator)
 	orionService.fetchOpampConfigFromOrion(Opsani)
 }
@@ -120,13 +119,13 @@ func (orionService *OrionService) fetchOpampConfigFromOrion(objectType ObjectTyp
 			objName := operationInfo.(map[string]interface{})["name"].(string)
 			// logger.Printf("Retrieved OPAMP config: ", itemConfigVal)
 
-			objConfigYamlBytes, err := yaml.Parser().Marshal(objConfig.(map[string]interface{}))
+			objConfigJsonBytes, err := json.Marshal(objConfig.(map[string]interface{}))
 			if err != nil {
-				logger.Printf("OPAMP config YAML parse error msg: ", err)
+				logger.Printf("OPAMP config JSON parse error msg: ", err)
 				return
 			}
 
-			saveCustomConfigForAllInstance(objName, objConfigYamlBytes)
+			saveCustomConfigForAllInstance(objName, objConfigJsonBytes)
 		}
 	}
 }
@@ -214,7 +213,7 @@ func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) 
 func saveCustomConfigForAllInstance(objName string, configBytes []byte) {
 	config := &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigFile{
-			objName: {Body: configBytes},
+			objName: {Body: configBytes, ContentType: "application/json"},
 		},
 	}
 
