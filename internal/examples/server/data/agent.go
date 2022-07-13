@@ -33,6 +33,10 @@ type Agent struct {
 	EffectiveConfig string
 
 	// Optional special remote config for this particular instance defined by
+	// the orion in the UI.
+	CustomRemoteConfig *protobufs.AgentRemoteConfig
+
+	// Optional special remote config for this particular instance defined by
 	// the user in the UI.
 	CustomInstanceConfig string
 
@@ -47,7 +51,13 @@ func NewAgent(
 	instanceId InstanceId,
 	conn types.Connection,
 ) *Agent {
-	return &Agent{InstanceId: instanceId, conn: conn}
+
+	customRemoteConfig := &protobufs.AgentRemoteConfig{
+		Config: &protobufs.AgentConfigMap{
+			ConfigMap: map[string]*protobufs.AgentConfigFile{},
+		},
+	}
+	return &Agent{InstanceId: instanceId, conn: conn, CustomRemoteConfig: customRemoteConfig}
 }
 
 // CloneReadonly returns a copy of the Agent that is safe to read.
@@ -218,9 +228,14 @@ func (agent *Agent) SetCustomConfig(
 ) {
 	agent.mux.Lock()
 
-	agent.CustomInstanceConfig = string(config.ConfigMap[""].Body)
+	for k, v := range config.ConfigMap {
+		logger.Printf("Updating remote configuration for key: ", k)
+		agent.CustomRemoteConfig.Config.ConfigMap[k] = v
+		agent.CustomInstanceConfig = agent.CustomInstanceConfig + string(v.Body)
+	}
 
 	configChanged := agent.calcRemoteConfig()
+	logger.Printf("Remote configuration changed: ", configChanged)
 	if configChanged {
 		if notifyWhenConfigIsApplied != nil {
 			// The caller wants to be notified when the Agent reports a status
@@ -255,30 +270,19 @@ func (agent *Agent) SetCustomConfig(
 func (agent *Agent) calcRemoteConfig() bool {
 	hash := sha256.New()
 
-	cfg := protobufs.AgentRemoteConfig{
-		Config: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigFile{},
-		},
-	}
-
-	// Add the custom config for this particular Agent instance. Use empty
-	// string as the config file name.
-	cfg.Config.ConfigMap[""] = &protobufs.AgentConfigFile{
-		Body: []byte(agent.CustomInstanceConfig),
-	}
-
 	// Calculate the hash.
-	for k, v := range cfg.Config.ConfigMap {
+	for k, v := range agent.CustomRemoteConfig.Config.ConfigMap {
+		// logger.Printf("Calculating remote configuration hash for key %s and %s", k, string(v.Body))
 		hash.Write([]byte(k))
 		hash.Write(v.Body)
 		hash.Write([]byte(v.ContentType))
 	}
 
-	cfg.ConfigHash = hash.Sum(nil)
+	agent.CustomRemoteConfig.ConfigHash = hash.Sum(nil)
 
-	configChanged := !isEqualRemoteConfig(agent.remoteConfig, &cfg)
+	configChanged := !isEqualRemoteConfig(agent.remoteConfig, agent.CustomRemoteConfig)
 
-	agent.remoteConfig = &cfg
+	agent.remoteConfig = proto.Clone(agent.CustomRemoteConfig).(*protobufs.AgentRemoteConfig)
 
 	return configChanged
 }

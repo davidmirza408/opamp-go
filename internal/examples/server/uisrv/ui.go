@@ -2,7 +2,6 @@ package uisrv
 
 import (
 	"context"
-	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"log"
 	"net/http"
 	"path"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/protobufs"
 )
 
@@ -73,12 +73,13 @@ func renderAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderOrion(w http.ResponseWriter, r *http.Request) {
-	opampConfig := orionsrv.OrionServ.GetOpampConfiguration()
-	if opampConfig == nil {
+	allOpampConfig := orionsrv.OrionServ.GetAllOpampConfiguration()
+	if allOpampConfig == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	renderTemplate(w, "orion.html", opampConfig)
+
+	renderTemplate(w, "orion.html", allOpampConfig)
 }
 
 func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
@@ -122,9 +123,21 @@ func saveOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configStr := r.PostForm.Get("config")
+	objectType := orionsrv.ObjectType(r.Form.Get("type"))
+	if objectType == "" {
+		logger.Printf("Object type not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-	if err := orionsrv.OrionServ.UpdateOpampConfiguration(configStr); err != nil {
+	configStr := r.PostForm.Get("config")
+	if configStr == "" {
+		logger.Printf("Configuration not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := orionsrv.OrionServ.UpdateOpampConfiguration(objectType, configStr); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

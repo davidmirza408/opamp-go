@@ -8,7 +8,7 @@ import (
 	"github.com/open-telemetry/opamp-go/server/types"
 )
 
-var logger = log.New(log.Default().Writer(), "[OPAMP] ", log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds)
+var logger = log.New(log.Default().Writer(), "[Server] ", log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds)
 
 type Agents struct {
 	mux         sync.RWMutex

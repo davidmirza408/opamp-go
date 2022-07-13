@@ -21,7 +21,7 @@ type Server struct {
 func NewServer(agents *data.Agents) *Server {
 	logger := log.New(
 		log.Default().Writer(),
-		"[OPAMP] ",
+		"[Server] ",
 		log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds,
 	)
 

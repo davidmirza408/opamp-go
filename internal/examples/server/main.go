@@ -27,9 +27,8 @@ func main() {
 
 	logger.Println("OpAMP Server running...")
 
-	logger.Println("Orion poller starting...")
 	orionsrv.Start()
-	logger.Println("Orion poller running...")
+	logger.Println("Orion Service starting...")
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)

@@ -20,8 +20,17 @@
 <table width="100%">
     <tr>
         <td valign="top">
-            Current Object Configuration:<br/>
-            <pre><code class="language-yaml">{{ .CurrentFullConfig }}</code></pre>
+            Current Otel Operator Config:<br/>
+            <div style="width:1200px;overflow:auto">
+                <pre><code class="language-json">{{ .OtelOperatorConfig.CurrentAllConfig }}</code></pre>
+            </div>
+        </td>
+
+        <td valign="top">
+            Current Opsani Config:<br/>
+            <div style="width:1200px;overflow:auto">
+                <pre><code class="language-json">{{ .OpsaniConfig.CurrentAllConfig }}</code></pre>
+            </div>
         </td>
     </tr>
 </table>
@@ -31,9 +40,19 @@
 <table width="100%">
     <tr>
         <td valign="top">
-            Update Object Configuration:<br/>
+            Update Otel Operator Configuration:<br/>
             <form action="/save_object_config" method="post">
-                <textarea cols="200" rows="20" name="config">{{ .CurrentObjectConfig }}</textarea><br/>
+                <input type="hidden" name="type" value="otelOperator"/>
+                <textarea cols="150" rows="20" name="config">{{ .OtelOperatorConfig.UpdateObjectConfig }}</textarea><br/>
+                <input type="submit" value="Save and Update Object"/>
+            </form>
+        </td>
+
+        <td valign="top">
+            Update Opsani Configuration:<br/>
+            <form action="/save_object_config" method="post">
+                <input type="hidden" name="type" value="opsani"/>
+                <textarea cols="150" rows="20" name="config">{{ .OpsaniConfig.UpdateObjectConfig }}</textarea><br/>
                 <input type="submit" value="Save and Update Object"/>
             </form>
         </td>

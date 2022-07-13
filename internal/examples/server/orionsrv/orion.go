@@ -23,24 +23,37 @@ var (
 	connectionError = errors.New("OPAMP operator configuration retrieval from ORION failed")
 )
 
+type ObjectType string
+
+const (
+	// Type of Opamp Solution
+	OtelOperator ObjectType = "otelOperator"
+	Opsani       ObjectType = "opsani"
+)
+
 type OrionService struct {
-	orionPoller        *OrionClientInfo
-	opampCurrentConfig *OpampConfiguration
+	orionClient    *OrionClientInfo
+	AllOpampConfig *AllOpampConfiguration
 }
 
 type OrionClientInfo struct {
-	apiKey               string
-	principalId          string
-	principalType        string
-	baseURL              string
-	opampOperatorAPIPath string
-	interval             time.Duration
-	HTTPClient           *http.Client
+	apiKey          string
+	principalId     string
+	principalType   string
+	baseURL         string
+	solutionAPIPath string
+	interval        time.Duration
+	HTTPClient      *http.Client
+}
+
+type AllOpampConfiguration struct {
+	OtelOperatorConfig *OpampConfiguration
+	OpsaniConfig       *OpampConfiguration
 }
 
 type OpampConfiguration struct {
-	CurrentFullConfig string
-	CurrentObjectConfig string
+	CurrentAllConfig   string
+	UpdateObjectConfig string
 }
 
 func Start() {
@@ -50,61 +63,77 @@ func Start() {
 func (orionService *OrionService) runForEver() {
 	for {
 		select {
-		case <-time.After(orionService.orionPoller.interval):
-			orionService.fetchOpampConfig()
+		case <-time.After(orionService.orionClient.interval):
+			orionService.fetchOpampConfiguration()
 		}
 	}
 }
 
-func (orionService *OrionService) GetOpampConfiguration() *OpampConfiguration {
-	orionService.fetchOpampConfig()
+func (orionService *OrionService) GetAllOpampConfiguration() *AllOpampConfiguration {
+	orionService.fetchOpampConfiguration()
 
-	return orionService.opampCurrentConfig
+	return orionService.AllOpampConfig
 }
 
-func (orionService *OrionService) UpdateOpampConfiguration(config string) error {
-	if _, err := orionService.updateOpampConfigFromOrion(config); err != nil {
+func (orionService *OrionService) UpdateOpampConfiguration(objectType ObjectType, config string) error {
+	if _, err := orionService.updateOpampConfigInOrion(objectType, config); err != nil {
 		return err
 	}
 
-	orionService.fetchOpampConfig()
 	return nil
 }
 
-func (orionService *OrionService) fetchOpampConfig() {
-	logger.Printf("Checking for OPAMP config update...")
+func (orionService *OrionService) fetchOpampConfiguration() {
+	orionService.fetchOpampConfigFromOrion(OtelOperator)
+	orionService.fetchOpampConfigFromOrion(Opsani)
+}
 
-	res, err := orionService.getOpampConfigFromOrion()
+func (orionService *OrionService) fetchOpampConfigFromOrion(objectType ObjectType) {
+	logger.Printf("Checking in Orion updated config for ", objectType)
+
+	res, err := orionService.getOpampConfigFromOrion(objectType)
 	if err != nil {
-		logger.Printf("OPAMP config update error msg: ", err)
+		logger.Printf("Orion config retrieval failed: ", err)
 		return
 	}
 
+	var opampConfig *OpampConfiguration
+	switch objectType {
+	case OtelOperator:
+		opampConfig = orionService.AllOpampConfig.OtelOperatorConfig
+	case Opsani:
+		opampConfig = orionService.AllOpampConfig.OpsaniConfig
+	default:
+		panic("Invalid OPAMP object type")
+	}
+
+	resIndented, err := json.MarshalIndent(res, "", "    ")
+	opampConfig.CurrentAllConfig = string(resIndented)
+	opampConfig.UpdateObjectConfig = ""
+
 	itemsSlice := res["items"].([]interface{})
 	if len(itemsSlice) > 0 {
-		lastItem := itemsSlice[0]
-		lastConfigVal := lastItem.(map[string]interface{})["object"]
-		// logger.Printf("Retrieved OPAMP config: ", firstConfigVal)
+		for _, item := range itemsSlice {
+			objConfig := item.(map[string]interface{})["object"]
 
-		lastConfigYamlBytes, err := yaml.Parser().Marshal(lastConfigVal.(map[string]interface{}))
-		if err != nil {
-			logger.Printf("OPAMP config YAML parse error msg: ", err)
-			return
+			operationInfo := objConfig.(map[string]interface{})["operationInfo"]
+			objName := operationInfo.(map[string]interface{})["name"].(string)
+			// logger.Printf("Retrieved OPAMP config: ", itemConfigVal)
+
+			objConfigYamlBytes, err := yaml.Parser().Marshal(objConfig.(map[string]interface{}))
+			if err != nil {
+				logger.Printf("OPAMP config YAML parse error msg: ", err)
+				return
+			}
+
+			saveCustomConfigForAllInstance(objName, objConfigYamlBytes)
 		}
-
-		saveCustomConfigForAllInstance(lastConfigYamlBytes)
-
-		fullJsonString, err := json.MarshalIndent(lastItem.(map[string]interface{}), "", "    ")
-		orionService.opampCurrentConfig.CurrentFullConfig = string(fullJsonString)
-
-		objectJsonString, err := json.MarshalIndent(lastConfigVal.(map[string]interface{}), "", "    ")
-		orionService.opampCurrentConfig.CurrentObjectConfig = string(objectJsonString)
 	}
 }
 
-func (orionService *OrionService) getOpampConfigFromOrion() (map[string]interface{}, error) {
-	req, err := http.NewRequest(
-		"GET", orionService.orionPoller.baseURL+orionService.orionPoller.opampOperatorAPIPath, nil)
+func (orionService *OrionService) getOpampConfigFromOrion(objectType ObjectType) (map[string]interface{}, error) {
+	url := orionService.orionClient.baseURL + orionService.orionClient.solutionAPIPath + string(objectType)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -120,10 +149,10 @@ func (orionService *OrionService) getOpampConfigFromOrion() (map[string]interfac
 	return res, nil
 }
 
-func (orionService *OrionService) updateOpampConfigFromOrion(config string) (map[string]interface{}, error) {
+func (orionService *OrionService) updateOpampConfigInOrion(objectType ObjectType, config string) (map[string]interface{}, error) {
+	url := orionService.orionClient.baseURL + orionService.orionClient.solutionAPIPath + string(objectType)
 	body := bytes.NewBuffer([]byte(config))
-	req, err := http.NewRequest(
-		"PUT", orionService.orionPoller.baseURL+orionService.orionPoller.opampOperatorAPIPath, body)
+	req, err := http.NewRequest("PUT", url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -143,9 +172,9 @@ func (orionService *OrionService) updateOpampConfigFromOrion(config string) (map
 // Content-type and body should be already added to req
 func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) error {
 	req.Header.Set("Accept", "application/json; charset=utf-8")
-	req.Header.Set("appd-pid", orionService.orionPoller.principalId)
-	req.Header.Set("appd-pty", orionService.orionPoller.principalType)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", orionService.orionPoller.apiKey))
+	req.Header.Set("appd-pid", orionService.orionClient.principalId)
+	req.Header.Set("appd-pty", orionService.orionClient.principalType)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", orionService.orionClient.apiKey))
 
 	reqDump, err := httputil.DumpRequestOut(req, true)
 	if err != nil {
@@ -154,7 +183,7 @@ func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) 
 
 	logger.Printf("REQUEST:\n%s\n", string(reqDump))
 
-	res, err := orionService.orionPoller.HTTPClient.Do(req)
+	res, err := orionService.orionClient.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -182,10 +211,10 @@ func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) 
 	return nil
 }
 
-func saveCustomConfigForAllInstance(configBytes []byte) {
+func saveCustomConfigForAllInstance(objName string, configBytes []byte) {
 	config := &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigFile{
-			"": {Body: configBytes},
+			objName: {Body: configBytes},
 		},
 	}
 
@@ -193,16 +222,19 @@ func saveCustomConfigForAllInstance(configBytes []byte) {
 }
 
 var OrionServ = OrionService{
-	orionPoller: &OrionClientInfo{
-		apiKey:               "http",
-		principalId:          "dXNlcg==",
-		principalType:        "c2VydmljZQ==",
-		baseURL:              "http://localhost:8084/json/v1",
-		opampOperatorAPIPath: "/opamp:operator",
-		interval:             defaultCheckInterval,
+	orionClient: &OrionClientInfo{
+		apiKey:          "http",
+		principalId:     "dXNlcg==",
+		principalType:   "c2VydmljZQ==",
+		baseURL:         "http://localhost:8084/json/v1",
+		solutionAPIPath: "/opamp:",
+		interval:        defaultCheckInterval,
 		HTTPClient: &http.Client{
 			Timeout: defaultCheckInterval,
 		},
 	},
-	opampCurrentConfig: &OpampConfiguration{},
+	AllOpampConfig: &AllOpampConfiguration{
+		OtelOperatorConfig: &OpampConfiguration{},
+		OpsaniConfig:       &OpampConfiguration{},
+	},
 }
