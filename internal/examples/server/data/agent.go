@@ -195,7 +195,9 @@ func (agent *Agent) processStatusUpdate(
 	// send the new remote config to the Agent.
 	if configChanged ||
 		(newStatus.RemoteConfigStatus != nil &&
-			bytes.Compare(newStatus.RemoteConfigStatus.LastRemoteConfigHash, agent.remoteConfig.ConfigHash) != 0) {
+			bytes.Compare(newStatus.RemoteConfigStatus.LastRemoteConfigHash, agent.remoteConfig.ConfigHash) != 0) ||
+		(newStatus.PackageStatuses != nil &&
+			bytes.Compare(newStatus.PackageStatuses.Hash, agent.remoteConfig.ConfigHash) != 0) {
 		// The new status resulted in a change in the config of the Agent or the Agent
 		// does not have this config (hash is different). Send the new config the Agent.
 		response.RemoteConfig = agent.remoteConfig

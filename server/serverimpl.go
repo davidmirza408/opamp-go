@@ -151,6 +151,7 @@ func (s *server) httpHandler(w http.ResponseWriter, req *http.Request) {
 
 	if req.Header.Get(headerContentType) == contentTypeProtobuf {
 		// Yes, a plain HTTP request.
+		s.logger.Debugf("starting with plain http")
 		s.handlePlainHTTPRequest(req, w)
 		return
 	}
