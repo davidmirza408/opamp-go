@@ -39,6 +39,8 @@ func Shutdown() {
 }
 
 func renderTemplate(w http.ResponseWriter, htmlTemplateFile string, data interface{}) {
+	// logger.Printf("Rendering html template: %s", htmlTemplateFile)
+
 	t, err := template.ParseFiles(
 		path.Join(htmlDir, "header.html"),
 		path.Join(htmlDir, htmlTemplateFile),

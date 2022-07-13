@@ -231,7 +231,6 @@ func (agent *Agent) SetCustomConfig(
 	for k, v := range config.ConfigMap {
 		logger.Printf("Updating remote configuration for key: ", k)
 		agent.CustomRemoteConfig.Config.ConfigMap[k] = v
-		agent.CustomInstanceConfig = agent.CustomInstanceConfig + string(v.Body)
 	}
 
 	configChanged := agent.calcRemoteConfig()
@@ -271,12 +270,18 @@ func (agent *Agent) calcRemoteConfig() bool {
 	hash := sha256.New()
 
 	// Calculate the hash.
+	var customInstanceConfig string
 	for k, v := range agent.CustomRemoteConfig.Config.ConfigMap {
 		// logger.Printf("Calculating remote configuration hash for key %s and %s", k, string(v.Body))
 		hash.Write([]byte(k))
 		hash.Write(v.Body)
 		hash.Write([]byte(v.ContentType))
+
+		customInstanceConfig = customInstanceConfig + string(v.Body) + "\n---\n"
+		// logger.Printf("CustomInstanceConfig configuration: ", customInstanceConfig)
 	}
+	agent.CustomInstanceConfig = customInstanceConfig
+	// logger.Printf("Final CustomInstanceConfig configuration: ", agent.CustomInstanceConfig)
 
 	agent.CustomRemoteConfig.ConfigHash = hash.Sum(nil)
 
