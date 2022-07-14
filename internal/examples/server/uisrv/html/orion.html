@@ -20,16 +20,16 @@
 <table width="100%">
     <tr>
         <td valign="top">
-            Current Otel Operator Config:<br/>
+            Current Otel Operator Configs:<br/>
             <div style="width:800px;overflow:auto">
                 <pre><code class="language-json">{{ .OtelOperatorConfig.CurrentAllConfig }}</code></pre>
             </div>
         </td>
 
         <td valign="top">
-            Current Opsani Config:<br/>
+            Current Deployment Configs:<br/>
             <div style="width:800px;overflow:auto">
-                <pre><code class="language-json">{{ .OpsaniConfig.CurrentAllConfig }}</code></pre>
+                <pre><code class="language-json">{{ .DeploymentConfig.CurrentAllConfig }}</code></pre>
             </div>
         </td>
     </tr>
@@ -49,10 +49,10 @@
         </td>
 
         <td valign="top">
-            Update Opsani Configuration:<br/>
+            Update Deployment Configuration:<br/>
             <form action="/save_object_config" method="post">
-                <input type="hidden" name="type" value="opsani"/>
-                <textarea cols="100" rows="20" name="config">{{ .OpsaniConfig.UpdateObjectConfig }}</textarea><br/>
+                <input type="hidden" name="type" value="deployment"/>
+                <textarea cols="100" rows="20" name="config">{{ .DeploymentConfig.UpdateObjectConfig }}</textarea><br/>
                 <input type="submit" value="Save and Update Object"/>
             </form>
         </td>

@@ -26,8 +26,8 @@ type ObjectType string
 
 const (
 	// Type of Opamp Solution
+	Deployment   ObjectType = "deployment"
 	OtelOperator ObjectType = "otelOperator"
-	Opsani       ObjectType = "opsani"
 )
 
 type OrionService struct {
@@ -46,8 +46,8 @@ type OrionClientInfo struct {
 }
 
 type AllOpampConfiguration struct {
+	DeploymentConfig   *OpampConfiguration
 	OtelOperatorConfig *OpampConfiguration
-	OpsaniConfig       *OpampConfiguration
 }
 
 type OpampConfiguration struct {
@@ -86,8 +86,8 @@ func (orionService *OrionService) UpdateOpampConfiguration(objectType ObjectType
 }
 
 func (orionService *OrionService) FetchAndUpdateLocalRemoteConfigs() {
+	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(Deployment)
 	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(OtelOperator)
-	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(Opsani)
 }
 
 func (orionService *OrionService) fetchAndUpdateLocalRemoteConfigFromOrion(objectType ObjectType) {
@@ -101,10 +101,10 @@ func (orionService *OrionService) fetchAndUpdateLocalRemoteConfigFromOrion(objec
 
 	var opampConfig *OpampConfiguration
 	switch objectType {
+	case Deployment:
+		opampConfig = orionService.AllOpampConfig.DeploymentConfig
 	case OtelOperator:
 		opampConfig = orionService.AllOpampConfig.OtelOperatorConfig
-	case Opsani:
-		opampConfig = orionService.AllOpampConfig.OpsaniConfig
 	default:
 		panic("Invalid OPAMP object type")
 	}
@@ -241,6 +241,6 @@ var OrionServ = OrionService{
 	},
 	AllOpampConfig: &AllOpampConfiguration{
 		OtelOperatorConfig: &OpampConfiguration{},
-		OpsaniConfig:       &OpampConfiguration{},
+		DeploymentConfig:   &OpampConfiguration{},
 	},
 }
