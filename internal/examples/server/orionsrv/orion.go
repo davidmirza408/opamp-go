@@ -63,13 +63,14 @@ func (orionService *OrionService) runForEver() {
 	for {
 		select {
 		case <-time.After(orionService.orionClient.interval):
-			orionService.FetchOpampConfiguration()
+			orionService.FetchAndUpdateLocalRemoteConfigs()
 		}
 	}
 }
 
 func (orionService *OrionService) GetAllOpampConfiguration() *AllOpampConfiguration {
-	orionService.FetchOpampConfiguration()
+	logger.Printf("Refreshing Orion Configuration UI....")
+	orionService.FetchAndUpdateLocalRemoteConfigs()
 
 	return orionService.AllOpampConfig
 }
@@ -78,16 +79,18 @@ func (orionService *OrionService) UpdateOpampConfiguration(objectType ObjectType
 	if _, err := orionService.updateOpampConfigInOrion(objectType, config); err != nil {
 		return err
 	}
+	orionService.FetchAndUpdateLocalRemoteConfigs()
 
+	data.AllAgents.PushRemoteConfigForAllAgents()
 	return nil
 }
 
-func (orionService *OrionService) FetchOpampConfiguration() {
-	orionService.fetchOpampConfigFromOrion(OtelOperator)
-	orionService.fetchOpampConfigFromOrion(Opsani)
+func (orionService *OrionService) FetchAndUpdateLocalRemoteConfigs() {
+	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(OtelOperator)
+	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(Opsani)
 }
 
-func (orionService *OrionService) fetchOpampConfigFromOrion(objectType ObjectType) {
+func (orionService *OrionService) fetchAndUpdateLocalRemoteConfigFromOrion(objectType ObjectType) {
 	logger.Printf("Checking in Orion updated config for ", objectType)
 
 	res, err := orionService.getOpampConfigFromOrion(objectType)
@@ -110,7 +113,11 @@ func (orionService *OrionService) fetchOpampConfigFromOrion(objectType ObjectTyp
 	opampConfig.CurrentAllConfig = string(resIndented)
 	opampConfig.UpdateObjectConfig = ""
 
-	itemsSlice := res["items"].([]interface{})
+	orionService.updateLocalRemoteConfig(res)
+}
+
+func (orionService *OrionService) updateLocalRemoteConfig(opampConfig map[string]interface{}) {
+	itemsSlice := opampConfig["items"].([]interface{})
 	if len(itemsSlice) > 0 {
 		for _, item := range itemsSlice {
 			objConfig := item.(map[string]interface{})["object"]
@@ -125,7 +132,7 @@ func (orionService *OrionService) fetchOpampConfigFromOrion(objectType ObjectTyp
 				return
 			}
 
-			saveCustomConfigForAllInstance(objName, objConfigJsonBytes)
+			orionService.setLocalRemoteConfigForAllAgents(objName, objConfigJsonBytes)
 		}
 	}
 }
@@ -210,14 +217,14 @@ func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) 
 	return nil
 }
 
-func saveCustomConfigForAllInstance(objName string, configBytes []byte) {
+func (orionService *OrionService) setLocalRemoteConfigForAllAgents(objName string, configBytes []byte) {
 	config := &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigFile{
 			objName: {Body: configBytes, ContentType: "application/json"},
 		},
 	}
 
-	data.AllAgents.SetCustomConfigForAllAgent(config)
+	data.AllAgents.SetLocalRemoteConfigForAllAgents(config)
 }
 
 var OrionServ = OrionService{

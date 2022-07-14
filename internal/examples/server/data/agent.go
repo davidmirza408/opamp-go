@@ -32,9 +32,8 @@ type Agent struct {
 	// Effective config reported by the Agent.
 	EffectiveConfig string
 
-	// Optional special remote config for this particular instance defined by
-	// the orion in the UI.
-	CustomRemoteConfig *protobufs.AgentRemoteConfig
+	// Current local remove config.
+	LocalRemoteConfig *protobufs.AgentRemoteConfig
 
 	// Optional special remote config for this particular instance defined by
 	// the user in the UI.
@@ -52,12 +51,12 @@ func NewAgent(
 	conn types.Connection,
 ) *Agent {
 
-	customRemoteConfig := &protobufs.AgentRemoteConfig{
+	localRemoteConfig := &protobufs.AgentRemoteConfig{
 		Config: &protobufs.AgentConfigMap{
 			ConfigMap: map[string]*protobufs.AgentConfigFile{},
 		},
 	}
-	return &Agent{InstanceId: instanceId, conn: conn, CustomRemoteConfig: customRemoteConfig}
+	return &Agent{InstanceId: instanceId, conn: conn, LocalRemoteConfig: localRemoteConfig}
 }
 
 // CloneReadonly returns a copy of the Agent that is safe to read.
@@ -210,6 +209,8 @@ func (agent *Agent) processStatusUpdate(
 		// The new status resulted in a change in the config of the Agent or the Agent
 		// does not have this config (hash is different). Send the new config the Agent.
 		response.RemoteConfig = agent.remoteConfig
+	} else {
+		logger.Printf("Remote configuration not changed")
 	}
 
 	agent.updateEffectiveConfig(newStatus, response)
@@ -229,8 +230,8 @@ func (agent *Agent) SetCustomConfig(
 	agent.mux.Lock()
 
 	for k, v := range config.ConfigMap {
-		logger.Printf("Updating remote configuration for key: ", k)
-		agent.CustomRemoteConfig.Config.ConfigMap[k] = v
+		logger.Printf("Updating local remote configuration for key: ", k)
+		agent.LocalRemoteConfig.Config.ConfigMap[k] = v
 	}
 
 	configChanged := agent.calcRemoteConfig()
@@ -263,6 +264,35 @@ func (agent *Agent) SetCustomConfig(
 	}
 }
 
+func (agent *Agent) SetLocalRemoteConfig(config *protobufs.AgentConfigMap) {
+	agent.mux.Lock()
+
+	for k, v := range config.ConfigMap {
+		logger.Printf("Updating local remote configuration for key: ", k)
+		agent.LocalRemoteConfig.Config.ConfigMap[k] = v
+	}
+
+	agent.mux.Unlock()
+}
+
+func (agent *Agent) PushRemoteConfig() {
+	agent.mux.Lock()
+
+	configChanged := agent.calcRemoteConfig()
+	logger.Printf("Remote configuration changed: ", configChanged)
+
+	if configChanged {
+		msg := &protobufs.ServerToAgent{
+			RemoteConfig: agent.remoteConfig,
+		}
+		agent.mux.Unlock()
+
+		agent.SendToAgent(msg)
+	} else {
+		agent.mux.Unlock()
+	}
+}
+
 // calcRemoteConfig calculates the remote config for this Agent. It returns true if
 // the calculated new config is different from the existing config stored in
 // Agent.remoteConfig.
@@ -271,23 +301,20 @@ func (agent *Agent) calcRemoteConfig() bool {
 
 	// Calculate the hash.
 	var customInstanceConfig string
-	for k, v := range agent.CustomRemoteConfig.Config.ConfigMap {
-		// logger.Printf("Calculating remote configuration hash for key %s and %s", k, string(v.Body))
+	for k, v := range agent.LocalRemoteConfig.Config.ConfigMap {
 		hash.Write([]byte(k))
 		hash.Write(v.Body)
 		hash.Write([]byte(v.ContentType))
 
 		customInstanceConfig = customInstanceConfig + string(v.Body) + "\n---\n"
-		// logger.Printf("CustomInstanceConfig configuration: ", customInstanceConfig)
 	}
 	agent.CustomInstanceConfig = customInstanceConfig
-	// logger.Printf("Final CustomInstanceConfig configuration: ", agent.CustomInstanceConfig)
 
-	agent.CustomRemoteConfig.ConfigHash = hash.Sum(nil)
+	agent.LocalRemoteConfig.ConfigHash = hash.Sum(nil)
 
-	configChanged := !isEqualRemoteConfig(agent.remoteConfig, agent.CustomRemoteConfig)
+	configChanged := !isEqualRemoteConfig(agent.remoteConfig, agent.LocalRemoteConfig)
 
-	agent.remoteConfig = proto.Clone(agent.CustomRemoteConfig).(*protobufs.AgentRemoteConfig)
+	agent.remoteConfig = proto.Clone(agent.LocalRemoteConfig).(*protobufs.AgentRemoteConfig)
 
 	return configChanged
 }

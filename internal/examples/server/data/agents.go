@@ -40,9 +40,15 @@ func (agents *Agents) SetCustomConfigForAgent(
 	}
 }
 
-func (agents *Agents) SetCustomConfigForAllAgent(config *protobufs.AgentConfigMap) {
+func (agents *Agents) SetLocalRemoteConfigForAllAgents(config *protobufs.AgentConfigMap) {
 	for _, agent := range agents.agentsById {
-		agent.SetCustomConfig(config, nil)
+		agent.SetLocalRemoteConfig(config)
+	}
+}
+
+func (agents *Agents) PushRemoteConfigForAllAgents() {
+	for _, agent := range agents.agentsById {
+		agent.PushRemoteConfig()
 	}
 }
 

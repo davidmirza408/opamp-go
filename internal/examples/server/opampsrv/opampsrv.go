@@ -67,7 +67,7 @@ func (srv *Server) onMessage(conn types.Connection, msg *protobufs.AgentToServer
 
 	agent := srv.agents.FindOrCreateAgent(instanceId, conn)
 
-	orionsrv.OrionServ.FetchOpampConfiguration()
+	orionsrv.OrionServ.FetchAndUpdateLocalRemoteConfigs()
 
 	// Start building the response.
 	response := &protobufs.ServerToAgent{}
