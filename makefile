@@ -59,3 +59,7 @@ gomoddownload:
 .PHONY: install-tools
 install-tools:
 	cd $(TOOLS_MOD_DIR) && go install github.com/ory/go-acc
+
+run-server: build-example-server
+	cd internal/examples/server && ./bin/server &
+	@echo Server UI is running at http://localhost:4321/
