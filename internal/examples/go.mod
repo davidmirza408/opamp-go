@@ -3,9 +3,11 @@ module github.com/open-telemetry/opamp-go/internal/examples
 go 1.17
 
 require (
+	github.com/golang/protobuf v1.5.2
 	github.com/knadh/koanf v1.3.3
 	github.com/oklog/ulid/v2 v2.0.2
 	github.com/open-telemetry/opamp-go v0.1.0
+	github.com/patrickmn/go-cache v1.0.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	go.opentelemetry.io/otel v1.3.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric v0.26.0
@@ -23,7 +25,6 @@ require (
 	github.com/go-logr/logr v1.2.1 // indirect
 	github.com/go-logr/stdr v1.2.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"runtime"
 	"sort"
@@ -79,11 +80,18 @@ func NewAgent(logger types.Logger, agentType string, agentVersion string) *Agent
 }
 
 func (agent *Agent) start() error {
-	agent.opampClient = client.NewWebSocket(agent.logger)
+	//agent.opampClient = client.NewWebSocket(agent.logger)
+
+	agent.opampClient = client.NewHTTP(agent.logger)
+
+	header := http.Header{}
+	header.Set("Content-Type", "application/x-protobuf")
 
 	settings := types.StartSettings{
-		OpAMPServerURL: "ws://127.0.0.1:4320/v1/opamp",
+		//OpAMPServerURL: "ws://127.0.0.1:4320/v1/opamp",
+		OpAMPServerURL: "http://127.0.0.1:4320/v1/opamp",
 		InstanceUid:    agent.instanceId.String(),
+		Header:         header,
 		Callbacks: types.CallbacksStruct{
 			OnConnectFunc: func() {
 				agent.logger.Debugf("Connected to the server.")

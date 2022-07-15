@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"sync"
-
+	"github.com/patrickmn/go-cache"
 	"google.golang.org/protobuf/proto"
+	"sync"
+	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
+
+var ca = cache.New(5*time.Minute, 5*time.Minute)
 
 // Agent represents a connected Agent.
 type Agent struct {
@@ -48,7 +51,7 @@ func NewAgent(
 	instanceId InstanceId,
 	conn types.Connection,
 ) *Agent {
-	return &Agent{InstanceId: instanceId, conn: conn}
+	return &Agent{InstanceId: instanceId, conn: conn, CustomInstanceConfig: "custom config:"}
 }
 
 // CloneReadonly returns a copy of the Agent that is safe to read.
@@ -98,7 +101,7 @@ func notifyStatusWatchers(statusUpdateWatchers []chan<- struct{}) {
 func (agent *Agent) updateStatusField(newStatus *protobufs.AgentToServer) (agentDescrChanged bool) {
 	prevStatus := agent.Status
 
-	if agent.Status == nil {
+	if prevStatus == nil {
 		// First time this Agent reports a status, remember it.
 		agent.Status = newStatus
 		agentDescrChanged = true
@@ -131,7 +134,6 @@ func (agent *Agent) updateStatusField(newStatus *protobufs.AgentToServer) (agent
 		// Update remote config status if it is included and is different from what we have.
 		if newStatus.RemoteConfigStatus != nil &&
 			!bytes.Equal(agent.Status.RemoteConfigStatus.Hash, newStatus.RemoteConfigStatus.Hash) {
-
 			if newStatus.RemoteConfigStatus.Status == protobufs.RemoteConfigStatus_UNSET {
 				// TODO: Request full RemoteConfigStatus using
 				// ServerToAgent_ReportRemoteConfigStatus flag.
@@ -252,6 +254,7 @@ func (agent *Agent) SetCustomConfig(
 // the calculated new config is different from the existing config stored in
 // Agent.remoteConfig.
 func (agent *Agent) calcRemoteConfig() bool {
+
 	hash := sha256.New()
 
 	cfg := protobufs.AgentRemoteConfig{
@@ -277,7 +280,19 @@ func (agent *Agent) calcRemoteConfig() bool {
 
 	configChanged := !isEqualRemoteConfig(agent.remoteConfig, &cfg)
 
-	agent.remoteConfig = &cfg
+	x, found := ca.Get(string(agent.InstanceId))
+	if found {
+		prevHash := x.([]byte)
+		if bytes.Compare(prevHash, cfg.ConfigHash) != 0 {
+			agent.remoteConfig = &cfg
+			ca.Set(string(agent.InstanceId), hash.Sum(nil), cache.NoExpiration)
+		}
+	} else {
+		agent.remoteConfig = &cfg
+		ca.Set(string(agent.InstanceId), hash.Sum(nil), cache.NoExpiration)
+	}
+
+	//agent.remoteConfig = &cfg
 
 	return configChanged
 }
