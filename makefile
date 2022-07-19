@@ -42,6 +42,10 @@ run-examples: build-examples
 	@echo Server UI is running at http://localhost:4321/
 	cd internal/examples/agent && ./bin/agent
 
+run-server: build-example-server
+	cd internal/examples/server && ./bin/server &
+	@echo Server UI is running at http://localhost:4321/
+
 # Generate Protobuf Go files.
 .PHONY: gen-proto
 gen-proto:

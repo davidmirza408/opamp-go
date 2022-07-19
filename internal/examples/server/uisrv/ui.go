@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/protobufs"
 )
 
@@ -24,6 +25,8 @@ func Start(rootDir string) {
 	mux.HandleFunc("/", renderRoot)
 	mux.HandleFunc("/agent", renderAgent)
 	mux.HandleFunc("/save_config", saveCustomConfigForInstance)
+	mux.HandleFunc("/orion", renderOrion)
+	mux.HandleFunc("/save_object_config", saveOpampObjectConfiguration)
 	srv = &http.Server{
 		Addr:    "0.0.0.0:4321",
 		Handler: mux,
@@ -69,6 +72,16 @@ func renderAgent(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "agent.html", agent)
 }
 
+func renderOrion(w http.ResponseWriter, r *http.Request) {
+	allOpampConfig := orionsrv.OrionServ.GetAllOpampConfiguration()
+	if allOpampConfig == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	renderTemplate(w, "orion.html", allOpampConfig)
+}
+
 func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -85,7 +98,7 @@ func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
 	configStr := r.PostForm.Get("config")
 	config := &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigFile{
-			"": {Body: []byte(configStr)},
+			"": {Body: []byte(configStr), ContentType: "application/json"},
 		},
 	}
 
@@ -102,4 +115,40 @@ func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/agent?instanceid="+string(instanceId), http.StatusSeeOther)
+}
+
+func saveOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	objectType := orionsrv.ObjectType(r.Form.Get("type"))
+	if objectType == "" {
+		logger.Printf("Object type not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	configStr := r.PostForm.Get("config")
+	if configStr == "" {
+		logger.Printf("Configuration not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := orionsrv.OrionServ.UpdateOpampConfiguration(objectType, configStr); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Wait for up to 1 seconds for a Status update, which is expected
+	// to be reported by the Agent after we set the remote config.
+	timer := time.NewTicker(time.Second * 1)
+
+	select {
+	case <-timer.C:
+	}
+
+	http.Redirect(w, r, "/orion", http.StatusSeeOther)
 }

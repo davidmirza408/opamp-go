@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"runtime"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	"github.com/knadh/koanf"
-	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/providers/rawbytes"
 	"github.com/oklog/ulid/v2"
 
@@ -21,20 +22,35 @@ import (
 )
 
 const localConfig = `
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-          http:
-    processors:
-    exporters:
-      logging:
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [logging]
+{
+  "receivers": {
+    "otlp": {
+      "protocols": {
+        "grpc": null,
+        "http": null
+      }
+    }
+  },
+  "processors": null,
+  "exporters": {
+    "logging": null
+  },
+  "service": {
+    "pipelines": {
+      "traces": {
+        "receivers": [
+          "otlp"
+        ],
+        "processors": [
+
+        ],
+        "exporters": [
+          "logging"
+        ]
+      }
+    }
+  }
+}
 `
 
 type Agent struct {
@@ -57,10 +73,16 @@ type Agent struct {
 	metricReporter *MetricReporter
 }
 
-func NewAgent(logger types.Logger, agentType string, agentVersion string) *Agent {
+func NewAgent(agentType string, agentVersion string) *Agent {
+	logger := log.New(
+		log.Default().Writer(),
+		"[Client] ",
+		log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds,
+	)
+
 	agent := &Agent{
 		effectiveConfig: localConfig,
-		logger:          logger,
+		logger:          &Logger{Logger: logger},
 		agentType:       agentType,
 		agentVersion:    agentVersion,
 	}
@@ -104,6 +126,7 @@ func (agent *Agent) start() error {
 		},
 		RemoteConfigStatus: agent.remoteConfigStatus,
 	}
+
 	err := agent.opampClient.SetAgentDescription(agent.agentDescription)
 	if err != nil {
 		return err
@@ -179,9 +202,9 @@ func (agent *Agent) updateAgentIdentity(instanceId ulid.ULID) {
 
 func (agent *Agent) loadLocalConfig() {
 	var k = koanf.New(".")
-	_ = k.Load(rawbytes.Provider([]byte(localConfig)), yaml.Parser())
+	_ = k.Load(rawbytes.Provider([]byte(localConfig)), json.Parser())
 
-	effectiveConfigBytes, err := k.Marshal(yaml.Parser())
+	effectiveConfigBytes, err := k.Marshal(json.Parser())
 	if err != nil {
 		panic(err)
 	}
@@ -203,7 +226,7 @@ func (agent *Agent) composeEffectiveConfig() *protobufs.EffectiveConfig {
 }
 
 func (agent *Agent) initMeter(settings *protobufs.TelemetryConnectionSettings) {
-	reporter, err := NewMetricReporter(agent.logger, settings, agent.agentType, agent.agentVersion, agent.instanceId)
+	reporter, err := NewMetricReporter(settings, agent.agentType, agent.agentVersion, agent.instanceId)
 	if err != nil {
 		agent.logger.Errorf("Cannot collect metrics: %v", err)
 		return
@@ -250,7 +273,7 @@ func (agent *Agent) applyRemoteConfig(config *protobufs.AgentRemoteConfig) (conf
 
 	// Begin with local config. We will later merge received configs on top of it.
 	var k = koanf.New(".")
-	if err := k.Load(rawbytes.Provider([]byte(localConfig)), yaml.Parser()); err != nil {
+	if err := k.Load(rawbytes.Provider([]byte(localConfig)), json.Parser()); err != nil {
 		return false, err
 	}
 
@@ -281,7 +304,7 @@ func (agent *Agent) applyRemoteConfig(config *protobufs.AgentRemoteConfig) (conf
 	// Merge received configs.
 	for _, item := range orderedConfigs {
 		var k2 = koanf.New(".")
-		err := k2.Load(rawbytes.Provider(item.file.Body), yaml.Parser())
+		err := k2.Load(rawbytes.Provider(item.file.Body), json.Parser())
 		if err != nil {
 			return false, fmt.Errorf("cannot parse config named %s: %v", item.name, err)
 		}
@@ -292,7 +315,7 @@ func (agent *Agent) applyRemoteConfig(config *protobufs.AgentRemoteConfig) (conf
 	}
 
 	// The merged final result is our effective config.
-	effectiveConfigBytes, err := k.Marshal(yaml.Parser())
+	effectiveConfigBytes, err := k.Marshal(json.Parser())
 	if err != nil {
 		panic(err)
 	}

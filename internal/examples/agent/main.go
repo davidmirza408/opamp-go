@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 
@@ -18,7 +17,7 @@ func main() {
 
 	flag.Parse()
 
-	agent := agent.NewAgent(&agent.Logger{log.Default()}, agentType, agentVersion)
+	agent := agent.NewAgent(agentType, agentVersion)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)

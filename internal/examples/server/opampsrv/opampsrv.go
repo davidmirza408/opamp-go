@@ -4,29 +4,34 @@ import (
 	"context"
 	"log"
 
+	"github.com/golang/protobuf/proto"
+	clientTypes "github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/internal/examples/server/data"
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
 
 type Server struct {
+	logger   clientTypes.Logger
 	opampSrv server.OpAMPServer
 	agents   *data.Agents
 }
 
 func NewServer(agents *data.Agents) *Server {
-	srv := &Server{
-		agents: agents,
-	}
-
 	logger := log.New(
 		log.Default().Writer(),
-		"[OPAMP] ",
+		"[Server] ",
 		log.Default().Flags()|log.Lmsgprefix|log.Lmicroseconds,
 	)
 
-	srv.opampSrv = server.New(&Logger{logger})
+	srv := &Server{
+		logger: &Logger{logger: logger},
+		agents: agents,
+	}
+
+	srv.opampSrv = server.New(srv.logger)
 
 	return srv
 }
@@ -42,7 +47,10 @@ func (srv *Server) Start() {
 		ListenEndpoint: "127.0.0.1:4320",
 	}
 
-	srv.opampSrv.Start(settings)
+	err := srv.opampSrv.Start(settings)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (srv *Server) Stop() {
@@ -54,9 +62,12 @@ func (srv *Server) onDisconnect(conn types.Connection) {
 }
 
 func (srv *Server) onMessage(conn types.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
+	srv.logger.Debugf("Received message: ", proto.MarshalTextString(msg))
 	instanceId := data.InstanceId(msg.InstanceUid)
 
 	agent := srv.agents.FindOrCreateAgent(instanceId, conn)
+
+	orionsrv.OrionServ.FetchAndUpdateLocalRemoteConfigs()
 
 	// Start building the response.
 	response := &protobufs.ServerToAgent{}
@@ -65,5 +76,6 @@ func (srv *Server) onMessage(conn types.Connection, msg *protobufs.AgentToServer
 	agent.UpdateStatus(msg, response)
 
 	// Send the response back to the Agent.
+	srv.logger.Debugf("Sending message: ", proto.MarshalTextString(response))
 	return response
 }

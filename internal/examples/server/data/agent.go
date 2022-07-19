@@ -6,8 +6,7 @@ import (
 	"crypto/sha256"
 	"sync"
 
-	"google.golang.org/protobuf/proto"
-
+	"github.com/golang/protobuf/proto"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
@@ -33,6 +32,9 @@ type Agent struct {
 	// Effective config reported by the Agent.
 	EffectiveConfig string
 
+	// Current local remove config.
+	LocalRemoteConfig *protobufs.AgentRemoteConfig
+
 	// Optional special remote config for this particular instance defined by
 	// the user in the UI.
 	CustomInstanceConfig string
@@ -48,7 +50,13 @@ func NewAgent(
 	instanceId InstanceId,
 	conn types.Connection,
 ) *Agent {
-	return &Agent{InstanceId: instanceId, conn: conn}
+
+	localRemoteConfig := &protobufs.AgentRemoteConfig{
+		Config: &protobufs.AgentConfigMap{
+			ConfigMap: map[string]*protobufs.AgentConfigFile{},
+		},
+	}
+	return &Agent{InstanceId: instanceId, conn: conn, LocalRemoteConfig: localRemoteConfig}
 }
 
 // CloneReadonly returns a copy of the Agent that is safe to read.
@@ -179,6 +187,7 @@ func (agent *Agent) processStatusUpdate(
 	response *protobufs.ServerToAgent,
 ) {
 	agentDescrChanged := agent.updateStatusField(newStatus)
+	logger.Printf("AgentDescription changed: ", agentDescrChanged)
 
 	configChanged := false
 	if agentDescrChanged {
@@ -186,6 +195,7 @@ func (agent *Agent) processStatusUpdate(
 		//
 		// We need to recalculate the config.
 		configChanged = agent.calcRemoteConfig()
+		logger.Printf("Remote configuration changed: ", configChanged)
 
 		// And set connection settings that are appropriate for the Agent description.
 		agent.calcConnectionSettings(response)
@@ -199,6 +209,8 @@ func (agent *Agent) processStatusUpdate(
 		// The new status resulted in a change in the config of the Agent or the Agent
 		// does not have this config (hash is different). Send the new config the Agent.
 		response.RemoteConfig = agent.remoteConfig
+	} else {
+		logger.Printf("Remote configuration not changed")
 	}
 
 	agent.updateEffectiveConfig(newStatus, response)
@@ -217,9 +229,13 @@ func (agent *Agent) SetCustomConfig(
 ) {
 	agent.mux.Lock()
 
-	agent.CustomInstanceConfig = string(config.ConfigMap[""].Body)
+	for k, v := range config.ConfigMap {
+		logger.Printf("Updating local remote configuration for key: ", k)
+		agent.LocalRemoteConfig.Config.ConfigMap[k] = v
+	}
 
 	configChanged := agent.calcRemoteConfig()
+	logger.Printf("Remote configuration changed: ", configChanged)
 	if configChanged {
 		if notifyWhenConfigIsApplied != nil {
 			// The caller wants to be notified when the Agent reports a status
@@ -248,36 +264,57 @@ func (agent *Agent) SetCustomConfig(
 	}
 }
 
+func (agent *Agent) SetLocalRemoteConfig(config *protobufs.AgentConfigMap) {
+	agent.mux.Lock()
+
+	for k, v := range config.ConfigMap {
+		logger.Printf("Updating local remote configuration for key: ", k)
+		agent.LocalRemoteConfig.Config.ConfigMap[k] = v
+	}
+
+	agent.mux.Unlock()
+}
+
+func (agent *Agent) PushRemoteConfig() {
+	agent.mux.Lock()
+
+	configChanged := agent.calcRemoteConfig()
+	logger.Printf("Remote configuration changed: ", configChanged)
+
+	if configChanged {
+		msg := &protobufs.ServerToAgent{
+			RemoteConfig: agent.remoteConfig,
+		}
+		agent.mux.Unlock()
+
+		agent.SendToAgent(msg)
+	} else {
+		agent.mux.Unlock()
+	}
+}
+
 // calcRemoteConfig calculates the remote config for this Agent. It returns true if
 // the calculated new config is different from the existing config stored in
 // Agent.remoteConfig.
 func (agent *Agent) calcRemoteConfig() bool {
 	hash := sha256.New()
 
-	cfg := protobufs.AgentRemoteConfig{
-		Config: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigFile{},
-		},
-	}
-
-	// Add the custom config for this particular Agent instance. Use empty
-	// string as the config file name.
-	cfg.Config.ConfigMap[""] = &protobufs.AgentConfigFile{
-		Body: []byte(agent.CustomInstanceConfig),
-	}
-
 	// Calculate the hash.
-	for k, v := range cfg.Config.ConfigMap {
+	var customInstanceConfig string
+	for k, v := range agent.LocalRemoteConfig.Config.ConfigMap {
 		hash.Write([]byte(k))
 		hash.Write(v.Body)
 		hash.Write([]byte(v.ContentType))
+
+		customInstanceConfig = customInstanceConfig + string(v.Body) + "\n---\n"
 	}
+	agent.CustomInstanceConfig = customInstanceConfig
 
-	cfg.ConfigHash = hash.Sum(nil)
+	agent.LocalRemoteConfig.ConfigHash = hash.Sum(nil)
 
-	configChanged := !isEqualRemoteConfig(agent.remoteConfig, &cfg)
+	configChanged := !isEqualRemoteConfig(agent.remoteConfig, agent.LocalRemoteConfig)
 
-	agent.remoteConfig = &cfg
+	agent.remoteConfig = proto.Clone(agent.LocalRemoteConfig).(*protobufs.AgentRemoteConfig)
 
 	return configChanged
 }
@@ -331,14 +368,9 @@ func (agent *Agent) calcConnectionSettings(response *protobufs.ServerToAgent) {
 	// Agent description, so we jst set them directly.
 
 	response.ConnectionSettings = &protobufs.ConnectionSettingsOffers{
-		Hash:  nil, // TODO: calc has from settings.
-		Opamp: nil,
-		OwnMetrics: &protobufs.TelemetryConnectionSettings{
-			// We just hard-code this to a port on a localhost on which we can
-			// run an Otel Collector for demo purposes. With real production
-			// servers this should likely point to an OTLP backend.
-			DestinationEndpoint: "http://localhost:4318/v1/metrics",
-		},
+		Hash:             nil, // TODO: calc has from settings.
+		Opamp:            nil,
+		OwnMetrics:       nil,
 		OwnTraces:        nil,
 		OwnLogs:          nil,
 		OtherConnections: nil,
@@ -349,5 +381,6 @@ func (agent *Agent) SendToAgent(msg *protobufs.ServerToAgent) {
 	agent.connMutex.Lock()
 	defer agent.connMutex.Unlock()
 
-	agent.conn.Send(context.Background(), msg)
+	logger.Printf("Sending self initiated message: ", proto.MarshalTextString(msg))
+	_ = agent.conn.Send(context.Background(), msg)
 }

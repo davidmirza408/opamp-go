@@ -52,6 +52,7 @@ func (c *httpClient) Start(ctx context.Context, settings types.StartSettings) er
 	c.sender.ScheduleSend()
 
 	c.common.StartConnectAndRun(c.runUntilStopped)
+	c.common.Logger.Debugf("Starting OpAMP HTTP client...")
 
 	return nil
 }
