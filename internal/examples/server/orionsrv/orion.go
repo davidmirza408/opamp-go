@@ -28,6 +28,7 @@ const (
 	// Type of Opamp Solution
 	Deployment   ObjectType = "deployment"
 	OtelOperator ObjectType = "otelOperator"
+	OtelStandalone ObjectType = "otelStandalone"
 )
 
 type OrionService struct {
@@ -48,6 +49,7 @@ type OrionClientInfo struct {
 type AllOpampConfiguration struct {
 	DeploymentConfig   *OpampConfiguration
 	OtelOperatorConfig *OpampConfiguration
+	OtelStandaloneConfig *OpampConfiguration
 }
 
 type OpampConfiguration struct {
@@ -68,11 +70,23 @@ func (orionService *OrionService) runForEver() {
 	}
 }
 
-func (orionService *OrionService) GetAllOpampConfiguration() *AllOpampConfiguration {
+func (orionService *OrionService) GetOpampConfiguration(objectType ObjectType) *OpampConfiguration {
 	logger.Printf("Refreshing Orion Configuration UI....")
 	orionService.FetchAndUpdateLocalRemoteConfigs()
 
-	return orionService.AllOpampConfig
+	var opampConfig *OpampConfiguration
+	switch objectType {
+	case Deployment:
+		opampConfig = orionService.AllOpampConfig.DeploymentConfig
+	case OtelOperator:
+		opampConfig = orionService.AllOpampConfig.OtelOperatorConfig
+	case OtelStandalone:
+		opampConfig = orionService.AllOpampConfig.OtelStandaloneConfig
+	default:
+		panic("Invalid OPAMP object type")
+	}
+
+	return opampConfig
 }
 
 func (orionService *OrionService) UpdateOpampConfiguration(objectType ObjectType, config string) error {
@@ -105,6 +119,8 @@ func (orionService *OrionService) fetchAndUpdateLocalRemoteConfigFromOrion(objec
 		opampConfig = orionService.AllOpampConfig.DeploymentConfig
 	case OtelOperator:
 		opampConfig = orionService.AllOpampConfig.OtelOperatorConfig
+	case OtelStandalone:
+		opampConfig = orionService.AllOpampConfig.OtelStandaloneConfig
 	default:
 		panic("Invalid OPAMP object type")
 	}

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"strings"
 	"text/template"
 	"time"
 
@@ -25,8 +26,13 @@ func Start(rootDir string) {
 	mux.HandleFunc("/", renderRoot)
 	mux.HandleFunc("/agent", renderAgent)
 	mux.HandleFunc("/save_config", saveCustomConfigForInstance)
-	mux.HandleFunc("/orion", renderOrion)
-	mux.HandleFunc("/save_object_config", saveOpampObjectConfiguration)
+
+	mux.HandleFunc("/otelOperator", renderOrion)
+	mux.HandleFunc("/otelStandalone", renderOrion)
+	mux.HandleFunc("/deployment", renderOrion)
+	mux.HandleFunc("/update_object_config", modifyOpampObjectConfiguration)
+	mux.HandleFunc("/patch_object_config", modifyOpampObjectConfiguration)
+
 	srv = &http.Server{
 		Addr:    "0.0.0.0:4321",
 		Handler: mux,
@@ -73,13 +79,20 @@ func renderAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderOrion(w http.ResponseWriter, r *http.Request) {
-	allOpampConfig := orionsrv.OrionServ.GetAllOpampConfiguration()
-	if allOpampConfig == nil {
+	objectType := orionsrv.ObjectType(r.URL.Path)
+	if objectType == "" {
+		logger.Printf("Object type not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	opampConfig := orionsrv.OrionServ.GetOpampConfiguration(objectType)
+	if opampConfig == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	renderTemplate(w, "orion.html", allOpampConfig)
+	renderTemplate(w, r.URL.Path+".html", opampConfig)
 }
 
 func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +130,7 @@ func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/agent?instanceid="+string(instanceId), http.StatusSeeOther)
 }
 
-func saveOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
+func modifyOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -137,9 +150,16 @@ func saveOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := orionsrv.OrionServ.UpdateOpampConfiguration(objectType, configStr); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if strings.HasSuffix(r.URL.Path, "update_object_config") {
+		if err := orionsrv.OrionServ.UpdateOpampConfiguration(objectType, configStr); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	} else {
+		/*if err := orionsrv.OrionServ.PatchOpampConfiguration(objectType, configStr); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}*/
 	}
 
 	// Wait for up to 1 seconds for a Status update, which is expected
@@ -150,5 +170,5 @@ func saveOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
 	case <-timer.C:
 	}
 
-	http.Redirect(w, r, "/orion", http.StatusSeeOther)
+	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
 }

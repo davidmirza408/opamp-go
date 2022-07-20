@@ -1,0 +1,58 @@
+{{ template "header.html" . }}
+
+<a href="/">Back to Home</a>
+
+<style>
+    td {
+        padding: 5px
+    }
+</style>
+
+<link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+
+<h3>Deployment Configuration</h3>
+
+<hr/>
+
+<table width="100%">
+    <tr>
+        <td valign="top">
+            Current Deployment Configs:<br/>
+            <div style="width:800px;overflow:auto">
+                <pre><code class="language-json">{{ .CurrentAllConfig }}</code></pre>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<hr/>
+
+<table width="100%">
+    <tr>
+        <td valign="top">
+            Update Deployment Configuration:<br/>
+            <form action="/update_object_config" method="post">
+                <input type="hidden" name="type" value="deployment"/>
+                <textarea cols="100" rows="20" name="config">{{ .UpdateObjectConfig }}</textarea><br/>
+                <input type="submit" value="Save and Update Object"/>
+            </form>
+        </td>
+
+        <td valign="top">
+            Patch Deployment Configuration:<br/>
+            <form action="/patch_object_config" method="post">
+                <input type="hidden" name="type" value="deployment"/>
+                <textarea cols="100" rows="20" name="config">{{ .UpdateObjectConfig }}</textarea><br/>
+                <input type="submit" value="Save and Patch Object"/>
+            </form>
+        </td>
+    </tr>
+</table>
+
+<hr/>
+
+</body>
+</html>
