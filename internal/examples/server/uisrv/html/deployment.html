@@ -20,9 +20,16 @@
 <table width="100%">
     <tr>
         <td valign="top">
-            Current Deployment Configs:<br/>
+            Current Solution Configs:<br/>
             <div style="width:800px;overflow:auto">
-                <pre><code class="language-json">{{ .CurrentAllConfig }}</code></pre>
+                <pre><code class="language-json">{{ .AllSolutionConfig }}</code></pre>
+            </div>
+        </td>
+
+        <td valign="top">
+            Current Tenant Configs:<br/>
+            <div style="width:800px;overflow:auto">
+                <pre><code class="language-json">{{ .AllTenantConfig }}</code></pre>
             </div>
         </td>
     </tr>
@@ -45,7 +52,7 @@
             Patch Deployment Configuration:<br/>
             <form action="/patch_object_config" method="post">
                 <input type="hidden" name="type" value="deployment"/>
-                <textarea cols="100" rows="20" name="config">{{ .UpdateObjectConfig }}</textarea><br/>
+                <textarea cols="100" rows="20" name="config">{{ .PatchObjectConfig }}</textarea><br/>
                 <input type="submit" value="Save and Patch Object"/>
             </form>
         </td>

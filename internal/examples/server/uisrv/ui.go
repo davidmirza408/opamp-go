@@ -79,9 +79,11 @@ func renderAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderOrion(w http.ResponseWriter, r *http.Request) {
-	objectType := orionsrv.ObjectType(r.URL.Path)
+	objTypeStr := r.URL.Path[1:]
+
+	objectType := orionsrv.ObjectType(objTypeStr)
 	if objectType == "" {
-		logger.Printf("Object type not found")
+		logger.Printf("Object type not found for: ", objTypeStr)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -92,7 +94,7 @@ func renderOrion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderTemplate(w, r.URL.Path+".html", opampConfig)
+	renderTemplate(w, objTypeStr+".html", opampConfig)
 }
 
 func saveCustomConfigForInstance(w http.ResponseWriter, r *http.Request) {

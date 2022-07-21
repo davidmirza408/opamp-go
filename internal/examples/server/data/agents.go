@@ -2,8 +2,10 @@ package data
 
 import (
 	"log"
+	"strings"
 	"sync"
 
+	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
@@ -40,9 +42,20 @@ func (agents *Agents) SetCustomConfigForAgent(
 	}
 }
 
-func (agents *Agents) SetLocalRemoteConfigForAllAgents(config *protobufs.AgentConfigMap) {
+func (agents *Agents) SetLocalRemoteConfigForAllAgents(objectType orionsrv.ObjectType, config *protobufs.AgentConfigMap) {
 	for _, agent := range agents.agentsById {
-		agent.SetLocalRemoteConfig(config)
+		var isManaged bool
+		if agent.Status != nil && agent.Status.AgentDescription != nil && agent.Status.AgentDescription.NonIdentifyingAttributes != nil {
+			for _, attr := range agent.Status.AgentDescription.NonIdentifyingAttributes {
+				if attr.Key == "host.name" && strings.HasPrefix(attr.Value.String(), "opamp-client") {
+					isManaged = true
+				}
+			}
+		}
+
+		if isManaged || objectType == orionsrv.OtelStandalone {
+			agent.SetLocalRemoteConfig(config)
+		}
 	}
 }
 

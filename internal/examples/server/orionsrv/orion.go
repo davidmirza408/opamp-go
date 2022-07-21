@@ -26,8 +26,8 @@ type ObjectType string
 
 const (
 	// Type of Opamp Solution
-	Deployment   ObjectType = "deployment"
-	OtelOperator ObjectType = "otelOperator"
+	Deployment     ObjectType = "deployment"
+	OtelOperator   ObjectType = "otelOperator"
 	OtelStandalone ObjectType = "otelStandalone"
 )
 
@@ -47,14 +47,16 @@ type OrionClientInfo struct {
 }
 
 type AllOpampConfiguration struct {
-	DeploymentConfig   *OpampConfiguration
-	OtelOperatorConfig *OpampConfiguration
+	DeploymentConfig     *OpampConfiguration
+	OtelOperatorConfig   *OpampConfiguration
 	OtelStandaloneConfig *OpampConfiguration
 }
 
 type OpampConfiguration struct {
-	CurrentAllConfig   string
+	AllSolutionConfig  string
+	AllTenantConfig    string
 	UpdateObjectConfig string
+	PatchObjectConfig  string
 }
 
 func Start() {
@@ -102,6 +104,7 @@ func (orionService *OrionService) UpdateOpampConfiguration(objectType ObjectType
 func (orionService *OrionService) FetchAndUpdateLocalRemoteConfigs() {
 	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(Deployment)
 	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(OtelOperator)
+	orionService.fetchAndUpdateLocalRemoteConfigFromOrion(OtelStandalone)
 }
 
 func (orionService *OrionService) fetchAndUpdateLocalRemoteConfigFromOrion(objectType ObjectType) {
@@ -126,13 +129,14 @@ func (orionService *OrionService) fetchAndUpdateLocalRemoteConfigFromOrion(objec
 	}
 
 	resIndented, err := json.MarshalIndent(res, "", "    ")
-	opampConfig.CurrentAllConfig = string(resIndented)
+	opampConfig.AllSolutionConfig = string(resIndented)
 	opampConfig.UpdateObjectConfig = ""
+	opampConfig.PatchObjectConfig = ""
 
-	orionService.updateLocalRemoteConfig(res)
+	orionService.updateLocalRemoteConfig(objectType, res)
 }
 
-func (orionService *OrionService) updateLocalRemoteConfig(opampConfig map[string]interface{}) {
+func (orionService *OrionService) updateLocalRemoteConfig(objectType ObjectType, opampConfig map[string]interface{}) {
 	itemsSlice := opampConfig["items"].([]interface{})
 	if len(itemsSlice) > 0 {
 		for _, item := range itemsSlice {
@@ -148,7 +152,7 @@ func (orionService *OrionService) updateLocalRemoteConfig(opampConfig map[string
 				return
 			}
 
-			orionService.setLocalRemoteConfigForAllAgents(objName, objConfigJsonBytes)
+			orionService.setLocalRemoteConfigForAllAgents(objectType, objName, objConfigJsonBytes)
 		}
 	}
 }
@@ -233,22 +237,22 @@ func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) 
 	return nil
 }
 
-func (orionService *OrionService) setLocalRemoteConfigForAllAgents(objName string, configBytes []byte) {
+func (orionService *OrionService) setLocalRemoteConfigForAllAgents(objectType ObjectType, objName string, configBytes []byte) {
 	config := &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigFile{
 			objName: {Body: configBytes, ContentType: "application/json"},
 		},
 	}
 
-	data.AllAgents.SetLocalRemoteConfigForAllAgents(config)
+	data.AllAgents.SetLocalRemoteConfigForAllAgents(objectType, config)
 }
 
 var OrionServ = OrionService{
 	orionClient: &OrionClientInfo{
 		apiKey:          "http",
-		principalId:     "dXNlcg==",
-		principalType:   "c2VydmljZQ==",
-		baseURL:         "http://localhost:8084/json/v1",
+		principalId:     "VVNFUg==",
+		principalType:   "U0VSVklDRQ==",
+		baseURL:         "http://localhost:8084/json/v1beta/objects",
 		solutionAPIPath: "/opamp:",
 		interval:        defaultCheckInterval,
 		HTTPClient: &http.Client{
@@ -256,7 +260,8 @@ var OrionServ = OrionService{
 		},
 	},
 	AllOpampConfig: &AllOpampConfiguration{
-		OtelOperatorConfig: &OpampConfiguration{},
-		DeploymentConfig:   &OpampConfiguration{},
+		DeploymentConfig:     &OpampConfiguration{},
+		OtelOperatorConfig:   &OpampConfiguration{},
+		OtelStandaloneConfig: &OpampConfiguration{},
 	},
 }
