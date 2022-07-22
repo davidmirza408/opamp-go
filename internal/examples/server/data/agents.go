@@ -5,7 +5,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/open-telemetry/opamp-go/internal/examples/server/orionsrv"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server/types"
 )
@@ -42,19 +41,25 @@ func (agents *Agents) SetCustomConfigForAgent(
 	}
 }
 
-func (agents *Agents) SetLocalRemoteConfigForAllAgents(objectType orionsrv.ObjectType, config *protobufs.AgentConfigMap) {
+func (agents *Agents) SetLocalRemoteConfigForAllAgents(objectType ObjectType, config *protobufs.AgentConfigMap) {
 	for _, agent := range agents.agentsById {
 		var isManaged bool
-		if agent.Status != nil && agent.Status.AgentDescription != nil && agent.Status.AgentDescription.NonIdentifyingAttributes != nil {
-			for _, attr := range agent.Status.AgentDescription.NonIdentifyingAttributes {
-				if attr.Key == "host.name" && strings.HasPrefix(attr.Value.String(), "opamp-client") {
-					isManaged = true
+
+		// Set the remote config for the agent only when you know the status of the agent.
+		if agent.Status != nil {
+			if agent.Status.AgentDescription != nil && agent.Status.AgentDescription.NonIdentifyingAttributes != nil {
+				for _, attr := range agent.Status.AgentDescription.NonIdentifyingAttributes {
+					if attr.Key == "host.name" && strings.Contains(attr.Value.String(), "opamp-client-") {
+						isManaged = true
+						break
+					}
 				}
 			}
-		}
 
-		if isManaged || objectType == orionsrv.OtelStandalone {
-			agent.SetLocalRemoteConfig(config)
+			logger.Printf("********* Client is from managed env: %s *******", isManaged)
+			if (isManaged && objectType != OtelStandalone) || (!isManaged && objectType == OtelStandalone) {
+				agent.SetLocalRemoteConfig(config)
+			}
 		}
 	}
 }

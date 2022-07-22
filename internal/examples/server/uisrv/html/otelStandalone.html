@@ -40,19 +40,32 @@
 <table width="100%">
     <tr>
         <td valign="top">
-            Update Otel Standalone Configuration:<br/>
+            Upsert Configuration:<br/>
             <form action="/update_object_config" method="post">
-                <input type="hidden" name="type" value="otelStandalone"/>
+                <input type="hidden" name="objectType" value="otelStandalone"/><br>
+
+                <input type="radio" id="solution" name="layerType" value="Solution" checked>
+                <label for="solution">Solution</label><br/>
+                <input type="radio" id="tenant" name="layerType" value="Tenant">
+                <label for="tenant">Tenant</label><br/>
+                <br/>
+
                 <textarea cols="100" rows="20" name="config">{{ .UpdateObjectConfig }}</textarea><br/>
-                <input type="submit" value="Save and Update Object"/>
+
+                <input type="submit" value="Save and Upsert Object"/>
             </form>
         </td>
 
         <td valign="top">
-            Patch Otel Standalone Configuration:<br/>
+            Patch Configuration:<br/>
             <form action="/patch_object_config" method="post">
-                <input type="hidden" name="type" value="otelStandalone"/>
+                <input type="hidden" name="objectType" value="otelStandalone"/><br>
+
+                <label for="objectId">ObjectId:</label><br>
+                <input type="text" id="objectId" name="objectId"><br><br>
+
                 <textarea cols="100" rows="20" name="config">{{ .PatchObjectConfig }}</textarea><br/>
+
                 <input type="submit" value="Save and Patch Object"/>
             </form>
         </td>

@@ -190,7 +190,7 @@ func (agent *Agent) processStatusUpdate(
 	logger.Printf("AgentDescription changed: ", agentDescrChanged)
 
 	configChanged := false
-	if agentDescrChanged {
+	if agentDescrChanged || !isEqualRemoteConfig(agent.remoteConfig, agent.LocalRemoteConfig) {
 		// Agent description is changed.
 		//
 		// We need to recalculate the config.

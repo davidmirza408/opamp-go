@@ -81,7 +81,7 @@ func renderAgent(w http.ResponseWriter, r *http.Request) {
 func renderOrion(w http.ResponseWriter, r *http.Request) {
 	objTypeStr := r.URL.Path[1:]
 
-	objectType := orionsrv.ObjectType(objTypeStr)
+	objectType := data.ObjectType(objTypeStr)
 	if objectType == "" {
 		logger.Printf("Object type not found for: ", objTypeStr)
 		w.WriteHeader(http.StatusBadRequest)
@@ -138,7 +138,7 @@ func modifyOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectType := orionsrv.ObjectType(r.Form.Get("type"))
+	objectType := data.ObjectType(r.Form.Get("objectType"))
 	if objectType == "" {
 		logger.Printf("Object type not found")
 		w.WriteHeader(http.StatusBadRequest)
@@ -153,15 +153,30 @@ func modifyOpampObjectConfiguration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.HasSuffix(r.URL.Path, "update_object_config") {
-		if err := orionsrv.OrionServ.UpdateOpampConfiguration(objectType, configStr); err != nil {
+		layerType := orionsrv.LayerType(r.Form.Get("layerType"))
+		if layerType == "" {
+			logger.Printf("Layer type not found")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if err := orionsrv.OrionServ.UpsertOpampConfiguration(objectType, layerType, configStr); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	} else {
-		/*if err := orionsrv.OrionServ.PatchOpampConfiguration(objectType, configStr); err != nil {
+		objectId := r.Form.Get("objectId")
+		if objectId == "" {
+			logger.Printf("Object ID not found")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if err := orionsrv.OrionServ.PatchOpampConfiguration(objectType, objectId, configStr); err != nil {
+			logger.Printf("Patch error %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
-		}*/
+		}
 	}
 
 	// Wait for up to 1 seconds for a Status update, which is expected

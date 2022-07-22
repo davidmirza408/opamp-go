@@ -67,13 +67,13 @@ func (srv *Server) onMessage(conn types.Connection, msg *protobufs.AgentToServer
 
 	agent := srv.agents.FindOrCreateAgent(instanceId, conn)
 
-	orionsrv.OrionServ.FetchAndUpdateLocalRemoteConfigs()
-
 	// Start building the response.
 	response := &protobufs.ServerToAgent{}
 
 	// Process the status report and continue building the response.
 	agent.UpdateStatus(msg, response)
+
+	orionsrv.OrionServ.FetchAndUpdateLocalRemoteConfigs()
 
 	// Send the response back to the Agent.
 	srv.logger.Debugf("Sending message: ", proto.MarshalTextString(response))
