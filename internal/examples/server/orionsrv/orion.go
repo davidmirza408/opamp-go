@@ -243,9 +243,9 @@ func (orionService *OrionService) sendRequest(req *http.Request, v interface{}) 
 		return err
 	}
 
-	respDump, err := httputil.DumpResponse(res, true)
-	if err != nil {
-		logger.Fatal(err)
+	respDump, err1 := httputil.DumpResponse(res, true)
+	if err1 != nil {
+		logger.Fatal(err1)
 	}
 
 	logger.Printf("RESPONSE:\n%s\n", string(respDump))
